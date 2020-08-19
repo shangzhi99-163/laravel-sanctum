@@ -1,15 +1,4 @@
-# Laravel Sanctum 
-What is Laravel Sanctum ?
-Laravel Sanctum provides a featherweight authentication system for SPAs (single page applications), mobile applications, and simple, token based APIs. Sanctum allows each user of your application to generate multiple API tokens for their account. These tokens may be granted abilities / scopes which specify which actions the tokens are allowed to perform..
 
-### You have to just follow a few steps to get following web services
-##### Login API
-##### Details API
-
-
-
-
-## Getting Started
 ### Step 1: setup database in .env file
 
 ```` 
@@ -35,6 +24,14 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 
 ````
 php artisan migrate
+
+
+ // mysql 5.7.7以下版本
+app\Providers\AppServiceProvider.php
+    public function boot()
+    {
+        Schema::defaultStringLength(191);
+    }
 
 ````
 
@@ -69,7 +66,17 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+  use HasApiTokens,Notifiable;
+    public function createToken(string $name, array $abilities = ['*'])
+    {
+        $token = $this->tokens()->create([
+            'name' => $name,
+            'token' => hash('sha256', $plainTextToken = Str::random(80)),
+            'abilities' => $abilities,
+        ]);
+
+        return new NewAccessToken($token, $plainTextToken);
+    }
 }
 
 ````
@@ -84,9 +91,9 @@ php artisan make:seeder UsersTableSeeder
 
 ```javascript 
 DB::table('users')->insert([
-    'name' => 'John Doe',
-    'email' => 'john@doe.com',
-    'password' => Hash::make('password')
+    'name' => 'Mr Jiang',
+    'email' => 'test@163.com',
+    'password' => Hash::make('123456')
 ]);
 ````
 
@@ -112,24 +119,33 @@ class UserController extends Controller
 {
     // 
 
-    function index(Request $request)
+       function index(Request $request)
     {
-        $user= User::where('email', $request->email)->first();
-        // print_r($data);
-            if (!$user || !Hash::check($request->password, $user->password)) {
-                return response([
-                    'message' => ['These credentials do not match our records.']
-                ], 404);
-            }
-        
-             $token = $user->createToken('my-app-token')->plainTextToken;
-        
+        if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
+            $user = User::where('email', $request->email)->first();
+            $token = $user->createToken('my-app-token')->plainTextToken;
             $response = [
                 'user' => $user,
                 'token' => $token
             ];
-        
-             return response($response, 201);
+            return response($response, 201);
+        } else {
+            return response([
+                'message' => ['账号或密码错误']
+            ], 404);
+        }
+
+    }
+
+    function users()
+    {
+        return Auth::user();
+    }
+
+    function logout()
+    {
+        Auth::logout();
+        return response('logout');
     }
 }
 
@@ -137,21 +153,47 @@ class UserController extends Controller
 ````
 
 
-## Step 11: Test with postman, Result will be below
+## Step 11: Test with [ VUE AXIOS ]
 
 ```javascript 
 
-{
-    "user": {
-        "id": 1,
-        "name": "John Doe",
-        "email": "john@doe.com",
-        "email_verified_at": null,
-        "created_at": null,
-        "updated_at": null
-    },
-    "token": "AbQzDgXa..."
-}
+           Login: function () {
+                let params_json = {
+                    email: 'zhangsan4@163.com',
+                    password: '123456',
+                };
+                axios.post('http://www.cors.com/api/login', params_json, {headers: {'Content-Type': 'application/json;charset=utf-8'}}).then(res => {
+                    console.log(res.data);
+                    localStorage.setItem('IsLogin', 'true');
+                    localStorage.setItem('Token', res.data.token)
+                }).catch(error => {
+                    console.log('请求失败', error);
+                });
+            },
+            Logout: function () {
+                axios.post('http://www.cors.com/api/logout').then(res => {
+                    localStorage.removeItem('IsLogin');
+                    localStorage.removeItem('Token');
+                    console.log('LogOut',res);
+                }).catch(error => {
+                    console.log('请求失败', error);
+                });
+
+            },
+            getUser: function () {
+                let headers = {
+                    'Content-Type': 'application/json;charset=utf-8',
+                    'Authorization': 'Bearer '+ localStorage.getItem('Token'),
+
+                };
+                axios.get('http://www.cors.com/api/users', {
+                    headers: headers
+                }).then(res => {
+                    console.log(res.data);
+                }).catch(error => {
+                    console.log('请求失败', error);
+                });
+            },
 
 ````
 
@@ -159,8 +201,17 @@ class UserController extends Controller
 
 ```javascript 
 
-Route::middleware('auth:sanctum')->get('/user', function () {
-   //controller path 
-});
+// 无需登录操作
+Route::post('login', 'UserController@index');
+
+
+Route::middleware('auth:sanctum')->get('users', 'UserController@users');
+
+//登录后操作
+Route::group(['middleware' => ['auth:sanctum']], function () {
+    Route::get('users', 'UserController@users');
+    Route::post('logout', 'UserController@logout');
 
 ````
+  
+    
