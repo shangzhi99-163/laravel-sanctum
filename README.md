@@ -26,8 +26,9 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 php artisan migrate
 
 
- // mysql 5.7.7以下版本
-app\Providers\AppServiceProvider.php
+ mysql 5.7.7以下版本
+文件路径: app\Providers\AppServiceProvider.php
+
     public function boot()
     {
         Schema::defaultStringLength(191);
@@ -117,9 +118,9 @@ use App\User;
 use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
-    // 
+      //
 
-       function index(Request $request)
+    function login(Request $request)
     {
         if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             $user = User::where('email', $request->email)->first();
@@ -144,10 +145,13 @@ class UserController extends Controller
 
     function logout()
     {
-        Auth::logout();
-        return response('logout');
+        $user = Auth::user();
+        //删除当前账号所有 Token
+        $user->tokens()->delete();
+        //删除当前账号指定 Token
+        //$user->tokens()->where('id', 53)->delete();
+        return response('');
     }
-}
 
 
 ````
@@ -157,9 +161,17 @@ class UserController extends Controller
 
 ```javascript 
 
-           Login: function () {
+            CSRF_Login: function () {
+                axios.get('/sanctum/csrf-cookie').then(res => {
+                    // 登录...
+                    console.log(res.data);
+                }).catch(error => {
+                    console.log('请求失败', error);
+                });
+            },
+            Login: function () {
                 let params_json = {
-                    email: 'zhangsan4@163.com',
+                    email: 'shangzhi99@163.com',
                     password: '123456',
                 };
                 axios.post('http://www.cors.com/api/login', params_json, {headers: {'Content-Type': 'application/json;charset=utf-8'}}).then(res => {
@@ -171,10 +183,14 @@ class UserController extends Controller
                 });
             },
             Logout: function () {
-                axios.post('http://www.cors.com/api/logout').then(res => {
+                let headers = {
+                    'Content-Type': 'application/json;charset=utf-8',
+                    'Authorization': 'Bearer ' + localStorage.getItem('Token'),
+                };
+                axios.post('http://www.cors.com/api/logout', '', {headers: headers}).then(res => {
                     localStorage.removeItem('IsLogin');
                     localStorage.removeItem('Token');
-                    console.log('LogOut',res);
+                    console.log('LogOut', res);
                 }).catch(error => {
                     console.log('请求失败', error);
                 });
@@ -183,8 +199,7 @@ class UserController extends Controller
             getUser: function () {
                 let headers = {
                     'Content-Type': 'application/json;charset=utf-8',
-                    'Authorization': 'Bearer '+ localStorage.getItem('Token'),
-
+                    'Authorization': 'Bearer ' + localStorage.getItem('Token'),
                 };
                 axios.get('http://www.cors.com/api/users', {
                     headers: headers
